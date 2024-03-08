@@ -2,6 +2,7 @@ import osproc
 import json
 import strutils
 import os
+import argparse
 
 
 proc getErrorInfo(output: string): void = 
@@ -12,20 +13,18 @@ proc getErrorInfo(output: string): void =
         echo output
     quit(0)
 
-proc compileLib() =
+proc compileLib(dllName: var string, arch: string = "i386"): void =
   if dirExists("dllcache"):
     removeDir("dllcache")
-  # 定义要执行的编译命令
-  let nimCmd = "nim c -d:release -d=mingw --app=lib --nomain --cpu=amd64 --nimcache=dllcache dll.nim"
-  # 执行编译命令并捕获输出
+  dllName = dllName.split('.')[0]
+  let nimCmd = "nim c -d:release -d=mingw --app=lib --nomain --cpu=" & arch & " -o:out/" & dllName & ".dll --nimcache=dllcache " & dllName & ".nim"
   echo "[*] Compiling origin C files"
   let originimProcess = execCmdEx(nimCmd, workingDir = ".")
   if originimProcess.exitCode != 0:
     getErrorInfo(originimProcess.output)
   echo "[*] Compiling origin C files successful"
   # 编译修改dll
-  # 解析json字符串
-  let jsonnode = parseFile("./dllcache/Dll.json")
+  let jsonnode = parseFile("./dllcache/" & dllName & ".json")
   let compileCmdItem =jsonnode["compile"]
   var compileFile = ($compileCmdItem[len(compileCmdItem)-1][0]).strip(leading=true,trailing=true, chars = {'\"'})
   var fileContent = readFile(compileFile)
@@ -39,12 +38,43 @@ proc compileLib() =
     getErrorInfo(nimProcess.output)
   echo "[*] Compiling patch C files successful"
   let linkCmdItem = $jsonnode["linkcmd"]
-  let linkCmd = linkCmdItem.strip(leading=true,trailing=true, chars = {'\"'}).replace("Dll.dll","Dll-x.dll")
+  let linkCmd = linkCmdItem.strip(leading=true,trailing=true, chars = {'\"'}).replace(dllName & ".dll",dllName & "-nomain.dll")
   let linkProcess = execCmdEx(linkCmd, workingDir = ".")
   if linkProcess.exitCode != 0:
     getErrorInfo(linkProcess.output)
   echo "[*] Linking patch C files successful"
   echo "[+] Done"
+  quit(0)
 
 when isMainModule:
-    compileLib()
+  const banner = """                                                                         
+  _    _   _       _          _   _   _               __  __           _         
+ | |  | | (_)     | |        | \ | | (_)             |  \/  |         (_)        
+ | |__| |  _    __| |   ___  |  \| |  _   _ __ ___   | \  / |   __ _   _   _ __  
+ |  __  | | |  / _` |  / _ \ | . ` | | | | '_ ` _ \  | |\/| |  / _` | | | | '_ \ 
+ | |  | | | | | (_| | |  __/ | |\  | | | | | | | | | | |  | | | (_| | | | | | | |
+ |_|  |_| |_|  \__,_|  \___| |_| \_| |_| |_| |_| |_| |_|  |_|  \__,_| |_| |_| |_|
+Author: S0cke3t
+Github: https://github.com/DeEpinGh0st/HideNimMain
+                                                """
+  var p = newParser:
+    help(banner & "\nHide the exported NimMain in a DLL")
+    arg("name", help="Specify the dll name.", nargs = 1)
+    option("-a","--arch", help="Specify the dll arch i386 or amd64.")
+  try:
+    var
+      objName,arch: string
+    var opts = p.parse()
+    objName = opts.name
+    arch = opts.arch
+    if arch == "":
+      echo "[!] No arch specified, redirect to i386"
+      compileLib(objName)
+    compileLib(objName,arch)
+  except ShortCircuit as err:
+    if err.flag == "argparse_help":
+      echo err.help
+      quit(1)
+  except UsageError:
+    stderr.writeLine getCurrentExceptionMsg()
+    quit(1)

@@ -1,0 +1,8 @@
+nimcache/
+dllcache/
+*.exe
+*.dll
+*.o
+nim.cfg
+.vscode/*
+*.code-workspace
