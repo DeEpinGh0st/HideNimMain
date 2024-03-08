@@ -17,7 +17,7 @@ proc compileLib(dllName: var string, arch: string = "i386"): void =
   if dirExists("dllcache"):
     removeDir("dllcache")
   dllName = dllName.split('.')[0]
-  let nimCmd = "nim c -d:release -d=mingw --app=lib --nomain --cpu=" & arch & " -o:out/" & dllName & ".dll --nimcache=dllcache " & dllName & ".nim"
+  let nimCmd = "nim c -d:release -d=mingw --app=lib --nomain --passL:\"-static-libgcc\" --cpu=" & arch & " -o:out/" & dllName & ".dll --nimcache=dllcache " & dllName & ".nim"
   echo "[*] Compiling origin C files"
   let originimProcess = execCmdEx(nimCmd, workingDir = ".")
   if originimProcess.exitCode != 0:
